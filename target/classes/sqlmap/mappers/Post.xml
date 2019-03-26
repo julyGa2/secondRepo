@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ga2board.main.dao.PostDAO">
+
+<resultMap id="select-Post-resultmap" type="com.ga2board.main.domain.Post">
+	<result property="id" 			column="POST_ID" 			javaType="String" 			jdbcType="VARCHAR"/>
+	<result property="title" 		column="POST_TITLE" 		javaType="String" 			jdbcType="VARCHAR"/>
+	<result property="password" 	column="POST_PASSWORD" 		javaType="String" 			jdbcType="VARCHAR"/>
+	<result property="content" 		column="POST_CONTENT" 		javaType="String" 			jdbcType="CLOB"/>
+	<result property="view" 		column="POST_VIEWS" 		javaType="Integer" 			jdbcType="NUMERIC"/>
+	<result property="date" 		column="POST_DATE" 			javaType="java.util.Date" 	jdbcType="DATE"/>
+	<result property="writer" 		column="POST_WRITER" 		javaType="String" 			jdbcType="VARCHAR"/>
+	<result property="updateDate" 	column="POST_UPDATE_DATE" 	javaType="java.util.Date" 	jdbcType="DATE"/>
+	<result property="updateWriter" column="POST_UPDATE_WRITER" javaType="String" 			jdbcType="VARCHAR"/>
+</resultMap>
+
+<resultMap id="select-Comments-resultMap" type="com.ga2board.main.domain.Comment">
+	<result property="id" 			column="CO_ID" 				javaType="String" 			jdbcType="VARCHAR"/>
+	<result property="postId" 		column="POST_ID" 			javaType="String" 			jdbcType="VARCHAR"/>
+	<result property="level" 		column="CO_LEVEL" 			javaType="Integer" 			jdbcType="NUMERIC"/>
+	<result property="parentId" 	column="PARENT_CO_ID" 		javaType="String" 			jdbcType="VARCHAR"/>
+	<result property="contents" 	column="CO_CONTENTS" 		javaType="String" 			jdbcType="VARCHAR"/>
+	<result property="password" 	column="CO_PASSWORD" 		javaType="String" 			jdbcType="VARCHAR"/>
+	<result property="date" 		column="CO_DATE" 			javaType="java.util.Date" 	jdbcType="DATE"/>
+	<result property="writer" 		column="CO_WRITER" 			javaType="String" 			jdbcType="VARCHAR"/>
+	<result property="updateDate" 	column="CO_UPDATE_DATE" 	javaType="java.util.Date" 	jdbcType="DATE"/>
+	<result property="updateWriter" column="CO_UPDATE_WRITER" 	javaType="String" 			jdbcType="VARCHAR"/>
+</resultMap>
+
+<resultMap id="select-Attachment-resultMap" type="com.ga2board.main.domain.Attachment">
+	<result property="id" 			column="FILE_ID" 				javaType="String" 			jdbcType="VARCHAR"/>
+	<result property="postId" 		column="POST_ID" 			javaType="String" 			jdbcType="VARCHAR"/>
+	<result property="fileName" 	column="FILE_NAME" 			javaType="String" 			jdbcType="VARCHAR"/>
+	<result property="filePath" 	column="FILE_PATH" 			javaType="String" 			jdbcType="VARCHAR"/>
+	<result property="fileOrg" 		column="FILE_ORG" 			javaType="String" 			jdbcType="VARCHAR"/>
+	<result property="size" 		column="FILE_SIZE" 			javaType="Long" 			jdbcType="NUMERIC"/>
+	<result property="updateDate" 	column="FILE_UPDATE_DATE" 	javaType="java.util.Date" 	jdbcType="DATE"/>
+	<result property="updateWriter" column="FILE_UPDATE_WRITER" javaType="String" 			jdbcType="VARCHAR"/>
+	<result property="delGB" 		column="FILE_DEL_GB" 		javaType="String" 			jdbcType="VARCHAR"/>
+</resultMap>
+
+
+	<select id = "postAllId" resultType="string">
+		SELECT POST_ID FROM GH_TEST
+	</select>
+	
+	
+	<select id = "selectBoardList" parameterType="com.ga2board.main.domain.Criteria" resultMap="select-Post-resultmap">
+		SELECT * FROM (
+    		SELECT 	p.POST_ID, p.POST_TITLE, p.POST_CONTENT, p.POST_VIEWS,
+    				p.POST_DATE, p.POST_WRITER, ROW_NUMBER() 
+    		OVER(ORDER BY p.POST_ID DESC) AS RNUM
+    		FROM GH_POST p
+		)
+		WHERE RNUM BETWEEN #{rowStart} AND #{rowEnd}
+	
+	</select>
+	
+	
+	<select id = "postListCount" resultType="int">
+		SELECT COUNT(POST_ID) FROM GH_POST
+	</select>
+	
+	
+	<select id="selectPostById" parameterType="string" resultMap="select-Post-resultmap">
+		SELECT p.POST_ID, p.POST_TITLE, p.POST_CONTENT, p.POST_VIEWS, p.POST_DATE, p.POST_WRITER 
+		FROM GH_POST p
+		WHERE p.POST_ID = #{id}
+	</select>
+	
+	
+	<select id="selectCommentsByPostId" parameterType="string" resultMap="select-Comments-resultMap">
+		SELECT c.CO_ID, c.POST_ID, c.CO_LEVEL, c.PARENT_CO_ID, c.CO_CONTENTS, c.CO_DATE, c.CO_WRITER
+		FROM GH_COMMENTS c
+		WHERE c.POST_ID = #{id}
+		START WITH c.PARENT_CO_ID IS NULL
+		CONNECT BY PRIOR c.CO_ID = c.PARENT_CO_ID
+	</select>
+	
+	
+	<select id="selectViewsByPostId" parameterType="string" resultType="int">
+		SELECT POST_VIEWS FROM GH_POST WHERE POST_ID = #{id}
+	</select>
+	
+	
+	<update id="updatePostViews" parameterType="map">
+		UPDATE GH_POST SET POST_VIEWS = #{views} WHERE POST_ID = #{id} 
+	</update>
+	
+	
+	<select id="selectLastCoId" resultType="string">
+		SELECT MIN(CO_ID) 
+		KEEP (DENSE_RANK FIRST ORDER BY CO_ID DESC)
+		FROM GH_COMMENTS
+	</select>
+	
+	
+	<insert id="insertFirstComment" parameterType="com.ga2board.main.domain.Comment">
+		INSERT INTO GH_COMMENTS 
+		(CO_ID, POST_ID, CO_LEVEL, CO_CONTENTS, CO_PASSWORD, CO_DATE, CO_WRITER) 
+		VALUES
+		(#{id}, #{postId}, #{level}, #{contents}, #{password}, SYSDATE, #{writer} )
+	</insert>
+	
+	
+	<select id="selectCoLevelByCoId" parameterType="string" resultType="int">
+		SELECT CO_LEVEL FROM GH_COMMENTS WHERE CO_ID = #{coId} 
+	</select>
+	
+
+	<insert id="insertReComment" parameterType="com.ga2board.main.domain.Comment">
+		INSERT INTO GH_COMMENTS 
+		(CO_ID, POST_ID, CO_LEVEL, PARENT_CO_ID, CO_CONTENTS, CO_PASSWORD, CO_DATE, CO_WRITER) 
+		VALUES
+		(#{id}, #{postId}, #{level}, #{parentId}, #{contents}, #{password}, SYSDATE, #{writer} )
+	</insert>
+	
+	
+	<select id="selectLastPostId" resultType="string">
+		SELECT MIN(POST_ID) 
+		KEEP (DENSE_RANK FIRST ORDER BY POST_ID DESC)
+		FROM GH_POST
+	</select>
+	
+	
+	<insert id="insertPost" parameterType="com.ga2board.main.domain.Post">
+	INSERT INTO GH_POST (POST_ID, POST_TITLE, POST_PASSWORD, POST_CONTENT, POST_VIEWS, POST_DATE, POST_WRITER)
+	VALUES
+	(#{id}, #{title}, #{password}, #{content}, #{view}, SYSDATE, #{writer})
+	
+	</insert>
+	
+	<select id="selectPostBySearchText" parameterType="map" resultMap="select-Post-resultmap">
+		SELECT * FROM (
+		    		SELECT 	p.POST_ID, p.POST_TITLE, p.POST_PASSWORD, p.POST_CONTENT, p.POST_VIEWS,
+		    				p.POST_DATE, p.POST_WRITER, p.POST_UPDATE_DATE, p.POST_UPDATE_WRITER, ROW_NUMBER() 
+		            OVER(ORDER BY p.POST_ID DESC) AS RNUM
+		    		FROM GH_POST p
+		            WHERE(POST_CONTENT LIKE #{searchText})
+                    OR
+                    (POST_TITLE LIKE #{searchText})
+                    OR
+                    (POST_WRITER LIKE #{searchText})
+					)
+				WHERE RNUM BETWEEN #{cri.rowStart} AND #{cri.rowEnd}
+		
+
+	</select>
+	
+	
+	<select id="selectSearchResultCount" parameterType="map" resultType="int">
+		SELECT COUNT(POST_ID) 
+		FROM GH_POST 
+		WHERE POST_WRITER LIKE #{searchText}
+		OR POST_CONTENT LIKE #{searchText}
+		OR POST_TITLE LIKE #{searchText}
+
+	</select>
+	
+	
+	<select id="selectPassword" parameterType="map" resultType="string">
+		SELECT POST_PASSWORD FROM GH_POST WHERE POST_WRITER = #{writer} AND POST_ID = #{postId}
+	</select>
+	
+	
+	<update id="updatePost" parameterType="com.ga2board.main.domain.Post">
+		UPDATE GH_POST 
+		SET 
+		POST_TITLE = #{title} ,
+		POST_CONTENT = #{content},
+		POST_UPDATE_DATE = SYSDATE,
+		POST_UPDATE_WRITER = #{updateWriter}
+		WHERE POST_ID = #{id}
+	</update>
+	
+	
+	<select id="selectChildCount" parameterType="string" resultType="int">
+		SELECT COUNT(CO_ID) FROM GH_COMMENTS WHERE PARENT_CO_ID = #{coId}
+	</select>
+	
+	
+	<select id="selectCommentPassword" parameterType="String" resultType="string">
+		SELECT CO_PASSWORD FROM GH_COMMENTS WHERE CO_ID = #{coId}
+	</select>
+	
+	
+	<delete id="deleteComment" parameterType="string">
+		DELETE FROM GH_COMMENTS WHERE CO_ID = #{coId}
+	</delete>
+	
+	
+	<select id="selectLastAttachmentId" resultType="string">
+		SELECT MIN(FILE_ID) 
+		KEEP (DENSE_RANK FIRST ORDER BY FILE_ID DESC)
+		FROM GH_ATTACHMENTS
+	</select> 
+	
+	<insert id="insertFile" parameterType="com.ga2board.main.domain.Attachment">
+		INSERT INTO GH_ATTACHMENTS 
+		(FILE_ID, POST_ID, FILE_PATH, FILE_NAME, FILE_ORG, FILE_SIZE, FILE_DEL_GB)
+		VALUES
+		(#{id}, #{postId}, #{filePath}, #{fileName}, #{fileOrg}, #{size}, #{delGB})
+	</insert>
+	
+	<select id="selectFileListByPostId" parameterType="string" resultMap="select-Attachment-resultMap">
+		SELECT FILE_ID, POST_ID, FILE_PATH, FILE_NAME, FILE_ORG, ROUND(FILE_SIZE/1024,1) AS FILE_SIZE, FILE_DEL_GB
+		FROM GH_ATTACHMENTS
+		WHERE POST_ID = #{postId}
+	</select>
+	
+	<select id="selectFileByFileId" parameterType="string" resultMap="select-Attachment-resultMap">
+		SELECT FILE_ID, POST_ID, FILE_PATH, FILE_NAME, FILE_ORG, ROUND(FILE_SIZE/1024,1) AS FILE_SIZE, FILE_DEL_GB
+		FROM GH_ATTACHMENTS
+		WHERE FILE_ID = #{fileId}
+	</select>
+	
+	
+	<delete id="deleteFile" parameterType="string">
+		DELETE FROM GH_ATTACHMENTS WHERE POST_ID = #{postId}
+	</delete>
+	
+	<delete id="deletePost" parameterType="string">
+		DELETE FROM GH_POST WHERE POST_ID = #{postId}
+	</delete>
+	
+	<delete id="deleteCommentByPostId" parameterType="string">
+		DELETE FROM GH_COMMENTS WHERE POST_ID = #{postId}
+	</delete>
+	
+	<delete id="deleteNotInFile" parameterType="map">
+		DELETE FROM GH_ATTACHMENTS
+		<where>
+			<if test="attIds != null">
+				FILE_ID NOT IN
+				<foreach item="item" separator="," collection="attIds" open="(" close=")">
+					#{item}
+				</foreach>
+			</if>
+			AND POST_ID = #{postId}
+		</where>
+	</delete>
+	
+	
+	<select id="selectPrePostId" parameterType="map" resultType="hashmap">
+		SELECT * 
+		FROM ( 
+    		SELECT POST_ID , POST_CONTENT, POST_TITLE, POST_WRITER, LAG(POST_ID,1,0) OVER (ORDER BY POST_ID) AS PRE_SEQ
+    		FROM GH_POST
+    		WHERE (
+	        	(POST_CONTENT LIKE #{searchText})
+	        	OR
+	        	(POST_TITLE LIKE #{searchText})
+	        	OR
+	        	(POST_WRITER LIKE #{searchText})
+        		)		
+    		 
+			)
+		WHERE POST_ID = #{postId}
+
+	</select>
+	
+	<select id="selectNextPostId" parameterType="map" resultType="hashmap">
+		SELECT * 
+		FROM ( 
+    		SELECT POST_ID , POST_CONTENT, POST_TITLE, POST_WRITER, LEAD(POST_ID,1,0) OVER (ORDER BY POST_ID) AS POST_SEQ
+    		FROM GH_POST
+    		WHERE(
+	        	(POST_CONTENT LIKE #{searchText})
+	        	OR
+	        	(POST_TITLE LIKE #{searchText})
+	        	OR
+	        	(POST_WRITER LIKE #{searchText})
+	        	)
+			)
+		WHERE POST_ID = #{postId}
+ 
+        	
+	
+	</select>
+	
+	
+</mapper>
